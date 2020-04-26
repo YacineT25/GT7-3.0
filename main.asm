@@ -35,7 +35,8 @@
 
 .EQU T1OVERFLOWL = 0xD4
 .EQU T1OVERFLOWH = 0xF5
-;E17C
+
+.EQU T2OVERFLOW = 0xEE
 
 ; BOOT CODE
 
@@ -106,6 +107,14 @@ init:
 	STS TCNT1H,R16
 	LDI R19,0x01
 	STS TIMSK1,R19			; Peripheral Interrupts Activated
+	
+	; TIMER2 Configuration
+	LDI R17,0x05
+	STS TCCR2B,R17			; 1024 Prescaler
+	LDI R16,T2OVERFLOW
+	STS TCNT2,R16
+	LDI R19,0x00
+	STS TIMSK2,R19			; Peripheral Interrupts NOT Activated
 
 
 	; GLOBAL INTERRUPTS ACTIVATION
@@ -119,7 +128,7 @@ init:
 
 
 ; STATE: OFF
-; In this case, the µC loops on nothing, just check the main switch
+; In this case, the ÂµC loops on nothing, just check the main switch
 ; state and launch the main menu if switched on
 off:
 	SBI PORTC,2
@@ -147,7 +156,6 @@ mainmenu:
 	
 gameinit:
 	LDI R19,0x00
-	LDI R17,0x00		; R17 -> 0 - On shifte l'écran
 	RCALL clearRAMa
 	RCALL clearRAMb
 	SBI PORTC,2
@@ -155,13 +163,17 @@ gameinit:
 	RCALL mapInit
 	RJMP game ;racestart
 	
-;racestart:
-;	; Lumières PORTC3 et PORTC2 (SBI et CBI)
-; 10 01 10 01 11 00 11 00 11 00 11 00 11 11 11 11
-; BUZZ (300-400 Hz)
-;	; R17 -> 0 (supprimer au dessus)
-;	; RJMP game
-;
+racestart:
+	LDI R4,0x00
+	LDI R12,0x01
+	STS TIMSK2,R12			; Peripheral Interrupts Activated
+	RCALL waitLong
+	LDI R12,0x00
+	STS TIMSK2,R12
+	LDI R17,0x00		; R17 -> 0 - On shifte l'Ã©cran
+	RJMP game
+	
+	
 
 game:
 	CBI PORTC,3				; Leds for visual check
@@ -262,7 +274,22 @@ timer1ISR:
 	POP R17
 	POP R16
 	RETI
-
+	
+timer2ISR:
+	PUSH R16
+	PUSH R17
+	LDI R16,T2OVERFLOW			
+	STS TCNT2,R16
+	CPI R4,0x00
+	BREQ buzzoff
+	SBI PORTB,1
+	RJMP EOI3
+	buzzoff:
+	CBI PORTB,1
+	EOI3:
+	POP R17
+	POP R16
+	RETI
 
 
 ;======================================= PERSONAL FUNCTIONS ============================================
